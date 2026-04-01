@@ -1,7 +1,9 @@
 const SUPABASE_URL = "https://wblvohrnsubeemtzvlws.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_7Ulaamw-CpI2WsP7r6P9ew_-H69fD0b";
 
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabaseClient = window.supabase?.createClient
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null;
 
 let usuarioLogado = null;
 let perfilLogado = null;
@@ -11,14 +13,40 @@ let lancamentosVisiveis = [];
 let alunoSelecionadoNota = null;
 let barChart = null;
 let pieChart = null;
+let carregandoSistema = false;
+
+const isMobile = () => window.innerWidth <= 780;
+
+function $(id) {
+  return document.getElementById(id);
+}
+
+function mostrarErroLogin(msg) {
+  const erroEl = $("loginErro");
+  if (erroEl) erroEl.textContent = msg || "";
+}
+
+function mostrarAviso(msg) {
+  window.alert(msg);
+}
 
 function usuarioEhAdmin() {
   return perfilLogado?.tipo_perfil === "admin_ases";
 }
 
+function getBaseIdsVisiveis() {
+  return new Set((basesVisiveis || []).map((base) => Number(base.id)).filter(Boolean));
+}
+
+function filtrarPorBasesVisiveis(lista, campo = "base_id") {
+  if (usuarioEhAdmin()) return lista || [];
+  const baseIds = getBaseIdsVisiveis();
+  return (lista || []).filter((item) => baseIds.has(Number(item?.[campo])));
+}
+
 function media(notas) {
   if (!notas || !notas.length) return 0;
-  const soma = notas.reduce((acc, n) => acc + Number(n), 0);
+  const soma = notas.reduce((acc, n) => acc + Number(n || 0), 0);
   return +(soma / notas.length).toFixed(1);
 }
 
@@ -29,7 +57,7 @@ function classificarMedia(valor) {
 }
 
 function formatarDataHora(iso) {
-  const data = new Date(iso);
+  const data = iso ? new Date(iso) : new Date();
   return {
     data: data.toLocaleDateString("pt-BR"),
     hora: data.toLocaleTimeString("pt-BR", {
@@ -40,52 +68,85 @@ function formatarDataHora(iso) {
   };
 }
 
-function toggleMenu() {
-  document.getElementById("sidebar").classList.toggle("open");
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function toggleMenu(forceOpen = null) {
+  const sidebar = $("sidebar");
+  const backdrop = $("mobileSidebarBackdrop");
+  if (!sidebar) return;
+
+  const abrir = forceOpen === null ? !sidebar.classList.contains("open") : Boolean(forceOpen);
+  sidebar.classList.toggle("open", abrir);
+  if (backdrop) backdrop.classList.toggle("show", abrir && isMobile());
+  document.body.classList.toggle("menu-open", abrir && isMobile());
+}
+
+function fecharMenuMobile() {
+  if (isMobile()) toggleMenu(false);
 }
 
 function trocarPagina(id, elemento) {
   document.querySelectorAll(".page").forEach((page) => page.classList.remove("active"));
-  document.getElementById(id).classList.add("active");
+  const pagina = $(id);
+  if (pagina) pagina.classList.add("active");
+
   document.querySelectorAll(".nav-item").forEach((item) => item.classList.remove("active"));
-  elemento.classList.add("active");
+  if (elemento) elemento.classList.add("active");
+
+  fecharMenuMobile();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function atualizarEstadoConexao() {
+  const chip = $("connectionBadge");
+  if (!chip) return;
+  chip.textContent = navigator.onLine ? "Online" : "Sem internet";
+  chip.classList.toggle("offline", !navigator.onLine);
 }
 
 async function fazerLogin() {
-  const email = document.getElementById("loginEmail").value.trim();
-  const senha = document.getElementById("loginSenha").value.trim();
-  const erroEl = document.getElementById("loginErro");
+  if (!supabaseClient) {
+    mostrarErroLogin("Falha ao carregar bibliotecas do sistema. Recarregue a página.");
+    return;
+  }
 
-  erroEl.textContent = "";
+  const email = $("loginEmail")?.value.trim() || "";
+  const senha = $("loginSenha")?.value.trim() || "";
+
+  mostrarErroLogin("");
 
   if (!email || !senha) {
-    erroEl.textContent = "Preencha e-mail e senha.";
+    mostrarErroLogin("Preencha e-mail e senha.");
     return;
   }
-
-  const { data, error } = await supabaseClient.auth.signInWithPassword({
-    email,
-    password: senha
-  });
-
-  if (error) {
-    erroEl.textContent = error.message || "Não foi possível entrar.";
-    return;
-  }
-
-  usuarioLogado = data.user;
 
   try {
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password: senha });
+
+    if (error) {
+      mostrarErroLogin(error.message || "Não foi possível entrar.");
+      return;
+    }
+
+    usuarioLogado = data.user;
     await carregarSessaoCompleta();
     abrirSistema();
   } catch (e) {
-    erroEl.textContent = e.message || "Erro ao carregar dados do usuário.";
-    await supabaseClient.auth.signOut();
+    console.error(e);
+    mostrarErroLogin(e.message || "Erro ao carregar dados do usuário.");
+    await supabaseClient?.auth.signOut();
   }
 }
 
 async function carregarSessaoCompleta() {
-  if (!usuarioLogado) return;
+  if (!usuarioLogado || !supabaseClient) return;
 
   const { data: perfil, error: perfilError } = await supabaseClient
     .from("profiles")
@@ -93,17 +154,16 @@ async function carregarSessaoCompleta() {
     .eq("id", usuarioLogado.id)
     .single();
 
-  if (perfilError) {
-    throw new Error("Não foi possível carregar o perfil do usuário.");
-  }
+  if (perfilError) throw new Error("Não foi possível carregar o perfil do usuário.");
 
   perfilLogado = perfil;
-
   await carregarBasesVisiveis();
   await carregarDadosSistema();
 }
 
 async function carregarBasesVisiveis() {
+  if (!supabaseClient) return;
+
   if (usuarioEhAdmin()) {
     const { data, error } = await supabaseClient
       .from("bases")
@@ -138,9 +198,23 @@ async function carregarBasesVisiveis() {
     .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
 }
 
+function setLoadingState(loading) {
+  carregandoSistema = loading;
+  document.body.classList.toggle("loading", loading);
+  const layer = $("loadingOverlay");
+  if (layer) layer.classList.toggle("show", loading);
+}
+
 async function carregarDadosSistema() {
-  await Promise.all([carregarAlunos(), carregarLancamentos()]);
-  renderTudo();
+  if (carregandoSistema) return;
+  setLoadingState(true);
+
+  try {
+    await Promise.all([carregarAlunos(), carregarLancamentos()]);
+    renderTudo();
+  } finally {
+    setLoadingState(false);
+  }
 }
 
 async function carregarAlunos() {
@@ -162,7 +236,7 @@ async function carregarAlunos() {
     .order("nome", { ascending: true });
 
   if (error) throw new Error("Erro ao carregar alunos.");
-  alunosVisiveis = data || [];
+  alunosVisiveis = filtrarPorBasesVisiveis(data || []);
 }
 
 async function carregarLancamentos() {
@@ -191,40 +265,44 @@ async function carregarLancamentos() {
         nome
       )
     `)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(5000);
 
   if (error) throw new Error("Erro ao carregar lançamentos.");
-  lancamentosVisiveis = data || [];
+  lancamentosVisiveis = filtrarPorBasesVisiveis(data || []);
 }
 
 function abrirSistema() {
-  document.getElementById("loginScreen").classList.add("hidden");
-  document.getElementById("appShell").classList.remove("hidden");
-  document.getElementById("usuarioInfo").textContent = `Responsável: ${perfilLogado.nome}`;
-  document.getElementById("baseBadge").textContent = usuarioEhAdmin()
+  $("loginScreen")?.classList.add("hidden");
+  $("appShell")?.classList.remove("hidden");
+  $("usuarioInfo").textContent = `Responsável: ${perfilLogado?.nome || "-"}`;
+  $("baseBadge").textContent = usuarioEhAdmin()
     ? "Acesso Geral - ASES"
     : (basesVisiveis[0]?.nome || "Sem base vinculada");
 
   preencherSelectBases();
+  atualizarEstadoConexao();
+  if (isMobile()) toggleMenu(false);
 }
 
 async function logout() {
-  await supabaseClient.auth.signOut();
+  await supabaseClient?.auth.signOut();
   usuarioLogado = null;
   perfilLogado = null;
   basesVisiveis = [];
   alunosVisiveis = [];
   lancamentosVisiveis = [];
 
-  document.getElementById("loginScreen").classList.remove("hidden");
-  document.getElementById("appShell").classList.add("hidden");
-  document.getElementById("loginEmail").value = "";
-  document.getElementById("loginSenha").value = "";
-  document.getElementById("loginErro").textContent = "";
+  $("loginScreen")?.classList.remove("hidden");
+  $("appShell")?.classList.add("hidden");
+  if ($("loginEmail")) $("loginEmail").value = "";
+  if ($("loginSenha")) $("loginSenha").value = "";
+  mostrarErroLogin("");
+  toggleMenu(false);
 }
 
 function preencherSelectBases() {
-  const select = document.getElementById("novaBaseAluno");
+  const select = $("novaBaseAluno");
   if (!select) return;
 
   select.innerHTML = "";
@@ -240,9 +318,7 @@ function preencherSelectBases() {
 function getNotasPorAluno() {
   const mapa = new Map();
 
-  alunosVisiveis.forEach((aluno) => {
-    mapa.set(aluno.id, []);
-  });
+  alunosVisiveis.forEach((aluno) => mapa.set(aluno.id, []));
 
   lancamentosVisiveis.forEach((item) => {
     if (!mapa.has(item.aluno_id)) mapa.set(item.aluno_id, []);
@@ -260,15 +336,32 @@ function renderTudo() {
   renderRelatorio();
 }
 
+function destruirGraficos() {
+  if (barChart) {
+    barChart.destroy();
+    barChart = null;
+  }
+  if (pieChart) {
+    pieChart.destroy();
+    pieChart = null;
+  }
+}
+
 function renderGraficos() {
+  const barCanvas = $("barChart");
+  const pieCanvas = $("pieChart");
+  if (!barCanvas || !pieCanvas || typeof Chart === "undefined") return;
+
   const notasPorAluno = getNotasPorAluno();
+  const limite = isMobile() ? 8 : 20;
 
   const barras = alunosVisiveis
     .map((aluno) => ({
       nome: aluno.nome,
       media: media(notasPorAluno.get(aluno.id) || [])
     }))
-    .sort((a, b) => b.media - a.media);
+    .sort((a, b) => b.media - a.media)
+    .slice(0, limite);
 
   const pizzaDados = [
     { label: "Ótimo", valor: 0 },
@@ -276,16 +369,15 @@ function renderGraficos() {
     { label: "Atenção", valor: 0 }
   ];
 
-  barras.forEach((item) => {
-    const categoria = classificarMedia(item.media);
+  alunosVisiveis.forEach((aluno) => {
+    const categoria = classificarMedia(media(notasPorAluno.get(aluno.id) || []));
     const alvo = pizzaDados.find((p) => p.label === categoria);
     if (alvo) alvo.valor += 1;
   });
 
-  if (barChart) barChart.destroy();
-  if (pieChart) pieChart.destroy();
+  destruirGraficos();
 
-  barChart = new Chart(document.getElementById("barChart"), {
+  barChart = new Chart(barCanvas, {
     type: "bar",
     data: {
       labels: barras.map((item) => item.nome),
@@ -294,16 +386,28 @@ function renderGraficos() {
           label: "Média do aluno",
           data: barras.map((item) => item.media),
           backgroundColor: "#1fb6e9",
-          borderRadius: 24,
-          borderSkipped: false
+          borderRadius: 16,
+          borderSkipped: false,
+          maxBarThickness: isMobile() ? 24 : 36
         }
       ]
     },
     options: {
+      animation: false,
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      plugins: {
+        legend: { display: false },
+        tooltip: { enabled: true }
+      },
       scales: {
+        x: {
+          ticks: {
+            autoSkip: true,
+            maxRotation: isMobile() ? 0 : 35,
+            minRotation: 0
+          }
+        },
         y: {
           beginAtZero: true,
           max: 10,
@@ -313,7 +417,7 @@ function renderGraficos() {
     }
   });
 
-  pieChart = new Chart(document.getElementById("pieChart"), {
+  pieChart = new Chart(pieCanvas, {
     type: "pie",
     data: {
       labels: pizzaDados.map((item) => item.label),
@@ -327,19 +431,19 @@ function renderGraficos() {
       ]
     },
     options: {
+      animation: false,
       responsive: true,
       maintainAspectRatio: false,
-      plugins: {
-        legend: { position: "bottom" }
-      }
+      plugins: { legend: { position: "bottom" } }
     }
   });
 }
 
 function renderRanking() {
-  const lista = document.getElementById("rankingList");
-  const notasPorAluno = getNotasPorAluno();
+  const lista = $("rankingList");
+  if (!lista) return;
 
+  const notasPorAluno = getNotasPorAluno();
   const ranking = alunosVisiveis
     .map((aluno) => ({
       nome: aluno.nome,
@@ -361,8 +465,8 @@ function renderRanking() {
     li.className = "ranking-item";
     li.innerHTML = `
       <div>
-        <strong>${item.nome}</strong><br>
-        <small>${item.base}</small>
+        <strong>${escapeHtml(item.nome)}</strong><br>
+        <small>${escapeHtml(item.base)}</small>
       </div>
       <strong>${item.media.toFixed(1)}</strong>
     `;
@@ -374,24 +478,25 @@ function renderResumo() {
   const notasPorAluno = getNotasPorAluno();
   const totalAlunos = alunosVisiveis.length;
   const totalLancamentos = lancamentosVisiveis.length;
-
   const medias = alunosVisiveis.map((aluno) => media(notasPorAluno.get(aluno.id) || []));
   const mediaBase = medias.length
     ? (medias.reduce((acc, valor) => acc + valor, 0) / medias.length).toFixed(1)
     : "0.0";
 
-  document.getElementById("totalAlunos").textContent = totalAlunos;
-  document.getElementById("totalLancamentos").textContent = totalLancamentos;
-  document.getElementById("mediaBase").textContent = mediaBase;
+  $("totalAlunos").textContent = totalAlunos;
+  $("totalLancamentos").textContent = totalLancamentos;
+  $("mediaBase").textContent = mediaBase;
 }
 
 function renderAlunos() {
-  const busca = document.getElementById("buscaAluno").value.toLowerCase().trim();
-  const lista = document.getElementById("listaAlunos");
-  const notasPorAluno = getNotasPorAluno();
+  const campoBusca = $("buscaAluno");
+  const busca = (campoBusca?.value || "").toLowerCase().trim();
+  const lista = $("listaAlunos");
+  if (!lista) return;
 
+  const notasPorAluno = getNotasPorAluno();
   const alunosFiltrados = alunosVisiveis.filter((aluno) =>
-    aluno.nome.toLowerCase().includes(busca)
+    (aluno.nome || "").toLowerCase().includes(busca)
   );
 
   lista.innerHTML = "";
@@ -407,16 +512,18 @@ function renderAlunos() {
     div.className = "student-row";
     div.innerHTML = `
       <div class="student-left">
-        <div class="avatar">${aluno.nome.charAt(0).toUpperCase()}</div>
+        <div class="avatar">${escapeHtml((aluno.nome || "?").charAt(0).toUpperCase())}</div>
         <div>
-          <div class="student-name">${aluno.nome}</div>
+          <div class="student-name">${escapeHtml(aluno.nome)}</div>
           <div class="student-meta">
-            Base: ${aluno.bases?.nome || "-"} | Média: ${media(notas).toFixed(1)} | Quantidade de notas: ${notas.length}
+            Base: ${escapeHtml(aluno.bases?.nome || "-")}<br>
+            Igreja: ${escapeHtml(aluno.bases?.igreja || "-")}<br>
+            Média: ${media(notas).toFixed(1)} | Quantidade de notas: ${notas.length}
           </div>
         </div>
       </div>
       <div class="student-actions">
-        <button class="btn btn-primary" onclick="abrirModalNota(${aluno.id})">Adicionar nota</button>
+        <button class="btn btn-primary" onclick="abrirModalNota(${Number(aluno.id)})">Adicionar nota</button>
       </div>
     `;
     lista.appendChild(div);
@@ -424,7 +531,8 @@ function renderAlunos() {
 }
 
 function renderRelatorio() {
-  const tbody = document.getElementById("relatorioBody");
+  const tbody = $("relatorioBody");
+  if (!tbody) return;
   tbody.innerHTML = "";
 
   if (!lancamentosVisiveis.length) {
@@ -436,50 +544,50 @@ function renderRelatorio() {
     const info = formatarDataHora(item.created_at);
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${item.alunos?.nome || "-"}</td>
-      <td>Semana ${item.semana ?? "-"}</td>
-      <td>${item.nota}</td>
-      <td>${info.data}</td>
-      <td>${info.hora}</td>
-      <td>${item.profiles?.nome || "-"}</td>
-      <td>${item.bases?.nome || "-"}</td>
-      <td>${item.bases?.igreja || "-"}</td>
+      <td data-label="Aluno">${escapeHtml(item.alunos?.nome || "-")}</td>
+      <td data-label="Semana">Semana ${item.semana ?? "-"}</td>
+      <td data-label="Nota">${escapeHtml(item.nota)}</td>
+      <td data-label="Data">${escapeHtml(info.data)}</td>
+      <td data-label="Hora">${escapeHtml(info.hora)}</td>
+      <td data-label="Quem lançou">${escapeHtml(item.profiles?.nome || "-")}</td>
+      <td data-label="Base">${escapeHtml(item.bases?.nome || "-")}</td>
+      <td data-label="Igreja">${escapeHtml(item.bases?.igreja || "-")}</td>
     `;
     tbody.appendChild(tr);
   });
 }
 
 function abrirModalAluno() {
-  document.getElementById("novoAlunoNome").value = "";
-  const campoBaseAdmin = document.getElementById("campoBaseAdmin");
+  if ($("novoAlunoNome")) $("novoAlunoNome").value = "";
+  const campoBaseAdmin = $("campoBaseAdmin");
 
   if (usuarioEhAdmin()) {
-    campoBaseAdmin.classList.remove("hidden");
+    campoBaseAdmin?.classList.remove("hidden");
   } else {
-    campoBaseAdmin.classList.add("hidden");
+    campoBaseAdmin?.classList.add("hidden");
   }
 
-  document.getElementById("modalAluno").classList.add("show");
+  $("modalAluno")?.classList.add("show");
 }
 
 function fecharModalAluno() {
-  document.getElementById("modalAluno").classList.remove("show");
+  $("modalAluno")?.classList.remove("show");
 }
 
 async function salvarAluno() {
-  const nome = document.getElementById("novoAlunoNome").value.trim();
+  const nome = $("novoAlunoNome")?.value.trim() || "";
 
   if (!nome) {
-    alert("Digite o nome do aluno.");
+    mostrarAviso("Digite o nome do aluno.");
     return;
   }
 
   const baseId = usuarioEhAdmin()
-    ? Number(document.getElementById("novaBaseAluno").value)
+    ? Number($("novaBaseAluno")?.value)
     : Number(basesVisiveis[0]?.id);
 
   if (!baseId) {
-    alert("Nenhuma base disponível para este usuário.");
+    mostrarAviso("Nenhuma base disponível para este usuário.");
     return;
   }
 
@@ -490,7 +598,7 @@ async function salvarAluno() {
   });
 
   if (error) {
-    alert(error.message || "Erro ao cadastrar aluno.");
+    mostrarAviso(error.message || "Erro ao cadastrar aluno.");
     return;
   }
 
@@ -500,46 +608,45 @@ async function salvarAluno() {
 }
 
 function abrirModalNota(alunoId) {
-  alunoSelecionadoNota = alunosVisiveis.find((aluno) => aluno.id === alunoId);
+  alunoSelecionadoNota = alunosVisiveis.find((aluno) => Number(aluno.id) === Number(alunoId));
   if (!alunoSelecionadoNota) return;
 
-  document.getElementById("semanaInput").value = "";
-  document.getElementById("notaInput").value = "";
-  document.getElementById("observacaoInput").value = "";
-  document.getElementById("modalNotaAluno").textContent =
-    `Aluno: ${alunoSelecionadoNota.nome} | Base: ${alunoSelecionadoNota.bases?.nome || "-"} | Igreja: ${alunoSelecionadoNota.bases?.igreja || "-"}`;
+  if ($("semanaInput")) $("semanaInput").value = "";
+  if ($("notaInput")) $("notaInput").value = "";
+  if ($("observacaoInput")) $("observacaoInput").value = "";
+  if ($("modalNotaAluno")) {
+    $("modalNotaAluno").textContent =
+      `Aluno: ${alunoSelecionadoNota.nome} | Base: ${alunoSelecionadoNota.bases?.nome || "-"} | Igreja: ${alunoSelecionadoNota.bases?.igreja || "-"}`;
+  }
 
-  document.getElementById("baseNotaInput").value =
-    alunoSelecionadoNota.bases?.nome || "";
+  if ($("baseNotaInput")) $("baseNotaInput").value = alunoSelecionadoNota.bases?.nome || "";
+  if ($("igrejaNotaInput")) $("igrejaNotaInput").value = alunoSelecionadoNota.bases?.igreja || "";
 
-  document.getElementById("igrejaNotaInput").value =
-    alunoSelecionadoNota.bases?.igreja || "";
-
-  document.getElementById("modalNota").classList.add("show");
+  $("modalNota")?.classList.add("show");
 }
 
 function fecharModalNota() {
   alunoSelecionadoNota = null;
-  document.getElementById("modalNota").classList.remove("show");
+  $("modalNota")?.classList.remove("show");
 }
 
 async function salvarNota() {
-  const semana = Number(document.getElementById("semanaInput").value);
-  const valor = parseFloat(document.getElementById("notaInput").value);
-  const observacao = document.getElementById("observacaoInput").value.trim();
+  const semana = Number($("semanaInput")?.value);
+  const valor = parseFloat($("notaInput")?.value);
+  const observacao = $("observacaoInput")?.value.trim() || "";
 
   if (!alunoSelecionadoNota) {
-    alert("Aluno não selecionado.");
+    mostrarAviso("Aluno não selecionado.");
     return;
   }
 
   if (!semana || semana < 1 || semana > 13) {
-    alert("Selecione uma semana entre 1 e 13.");
+    mostrarAviso("Selecione uma semana entre 1 e 13.");
     return;
   }
 
   if (Number.isNaN(valor) || valor < 0 || valor > 10) {
-    alert("Digite uma nota válida entre 0 e 10.");
+    mostrarAviso("Digite uma nota válida entre 0 e 10.");
     return;
   }
 
@@ -553,7 +660,7 @@ async function salvarNota() {
   });
 
   if (error) {
-    alert(error.message || "Erro ao salvar nota.");
+    mostrarAviso(error.message || "Erro ao salvar nota.");
     return;
   }
 
@@ -563,22 +670,27 @@ async function salvarNota() {
 }
 
 function exportarExcel() {
+  if (typeof XLSX === "undefined") {
+    mostrarAviso("A biblioteca de exportação não foi carregada.");
+    return;
+  }
+
   const linhas = lancamentosVisiveis.map((item) => {
     const info = formatarDataHora(item.created_at);
     return {
       "Nome do aluno": item.alunos?.nome || "-",
-      "Semana": item.semana ?? "-",
-      "Nota": item.nota,
-      "Data": info.data,
-      "Hora": info.hora,
+      Semana: item.semana ?? "-",
+      Nota: item.nota,
+      Data: info.data,
+      Hora: info.hora,
       "Quem lançou": item.profiles?.nome || "-",
-      "Base": item.bases?.nome || "-",
-      "Igreja": item.bases?.igreja || "-"
+      Base: item.bases?.nome || "-",
+      Igreja: item.bases?.igreja || "-"
     };
   });
 
   if (!linhas.length) {
-    alert("Não há lançamentos para exportar.");
+    mostrarAviso("Não há lançamentos para exportar.");
     return;
   }
 
@@ -588,15 +700,46 @@ function exportarExcel() {
   XLSX.writeFile(workbook, "relatorio_notas.xlsx");
 }
 
-window.addEventListener("click", function (event) {
-  const modalAluno = document.getElementById("modalAluno");
-  const modalNota = document.getElementById("modalNota");
+window.addEventListener("click", (event) => {
+  const modalAluno = $("modalAluno");
+  const modalNota = $("modalNota");
 
   if (event.target === modalAluno) fecharModalAluno();
   if (event.target === modalNota) fecharModalNota();
 });
 
+window.addEventListener("online", atualizarEstadoConexao);
+window.addEventListener("offline", atualizarEstadoConexao);
+
+let resizeTimer;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if (!isMobile()) {
+      toggleMenu(true);
+    } else {
+      toggleMenu(false);
+    }
+    renderGraficos();
+  }, 150);
+});
+
 window.addEventListener("DOMContentLoaded", async () => {
+  atualizarEstadoConexao();
+
+  if (!window.supabase || !window.Chart || !window.XLSX) {
+    mostrarErroLogin("Alguns recursos não carregaram. Verifique sua conexão e recarregue a página.");
+    return;
+  }
+
+  if (isMobile()) toggleMenu(false);
+
+  document.querySelectorAll("input, select").forEach((el) => {
+    el.addEventListener("focus", () => {
+      setTimeout(() => el.scrollIntoView({ block: "center", behavior: "smooth" }), 250);
+    });
+  });
+
   const { data } = await supabaseClient.auth.getSession();
 
   if (data.session?.user) {

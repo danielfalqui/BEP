@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <div id="loadingOverlay" class="loading-overlay"><div class="loading-box">Carregando dados...</div></div>
   <section id="loginScreen" class="login-screen">
     <div class="login-overlay"></div>
     <div class="login-layout">
@@ -58,6 +59,7 @@
       </div>
 
       <div class="topbar-right">
+        <span id="connectionBadge" class="connection-badge">Online</span>
         <span id="baseBadge" class="base-badge">Carregando base...</span>
         <span id="usuarioInfo" class="topbar-subtitle">Responsável: ...</span>
         <button class="btn btn-secondary" onclick="logout()">Sair</button>
@@ -65,6 +67,7 @@
     </header>
 
    <div class="layout">
+      <div id="mobileSidebarBackdrop" class="sidebar-backdrop" onclick="toggleMenu(false)"></div>
       <aside id="sidebar" class="sidebar open">
 
         <!-- MENU ATUALIZADO -->
@@ -172,7 +175,7 @@
             <button class="btn btn-primary" onclick="exportarExcel()">Exportar Excel</button>
           </div>
 
-          <div class="card card-accent" style="overflow:auto;">
+          <div class="card card-accent table-wrapper">
             <table>
               <thead>
                 <tr>
@@ -267,9 +270,9 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
-  <script src="script.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script defer src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+  <script defer src="script.js"></script>
 </body>
 </html>
