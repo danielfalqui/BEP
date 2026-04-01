@@ -381,18 +381,16 @@ function renderGraficos() {
     type: "bar",
     data: {
       labels: barras.map((item) => item.nome),
-     datasets: 
-      [
-       {
-    label: 'Média',
-    data: dados,
-    backgroundColor: '#3aa0c4',
-    barThickness: 50,        
-    maxBarThickness: 60,     
-    categoryPercentage: 0.8, 
-    barPercentage: 0.9
-      }
-     ]
+      datasets: [
+        {
+          label: "Média do aluno",
+          data: barras.map((item) => item.media),
+          backgroundColor: "#1fb6e9",
+          borderRadius: 16,
+          borderSkipped: false,
+          maxBarThickness: isMobile() ? 24 : 36
+        }
+      ]
     },
     options: {
       animation: false,
