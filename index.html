@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>BEP Teen | Sistema de Notas v5</title>
+  <title>BEP Teen | Sistema de Notas v6</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div id="loadingOverlay" class="loading-overlay"><div class="loading-box">Carregando dados...</div></div>
+  <div id="loadingOverlay" class="loading-overlay"><div class="loading-box"><div class="loading-spinner"></div><div class="loading-title">Carregando dados...</div><div class="loading-subtitle">Aguarde enquanto o sistema busca as informações.</div></div></div>
   <section id="loginScreen" class="login-screen">
     <div class="login-overlay"></div>
     <div class="login-layout">
@@ -104,10 +104,8 @@
               <div class="card card-accent">
                 <div class="section-title">Média por aluno</div>
                 <p class="texto-secundario">Comparativo das médias com base nos lançamentos registrados.</p>
-                <div class="chart-area chart-scroll-area">
-                  <div class="chart-scroll-inner">
-                    <canvas id="barChart"></canvas>
-                  </div>
+                <div class="chart-area">
+                  <canvas id="barChart"></canvas>
                 </div>
               </div>
 

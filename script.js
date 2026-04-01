@@ -273,6 +273,7 @@ async function carregarLancamentos() {
 }
 
 function abrirSistema() {
+  setLoadingState(true);
   $("loginScreen")?.classList.add("hidden");
   $("appShell")?.classList.remove("hidden");
   $("usuarioInfo").textContent = `Responsável: ${perfilLogado?.nome || "-"}`;
@@ -283,6 +284,10 @@ function abrirSistema() {
   preencherSelectBases();
   atualizarEstadoConexao();
   if (isMobile()) toggleMenu(false);
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => setLoadingState(false));
+  });
 }
 
 async function logout() {
@@ -329,11 +334,13 @@ function getNotasPorAluno() {
 }
 
 function renderTudo() {
-  renderGraficos();
-  renderRanking();
   renderResumo();
+  renderRanking();
   renderAlunos();
   renderRelatorio();
+  requestAnimationFrame(() => {
+    renderGraficos();
+  });
 }
 
 function destruirGraficos() {
@@ -376,18 +383,6 @@ function renderGraficos() {
   });
 
   destruirGraficos();
-
-  const larguraPorBarra = isMobile() ? 96 : 130;
-  const larguraMinimaGrafico = isMobile() ? 560 : 900;
-  const larguraGrafico = Math.max(larguraMinimaGrafico, barras.length * larguraPorBarra);
-
-  if (barCanvas) {
-    barCanvas.width = larguraGrafico;
-    barCanvas.style.width = `${larguraGrafico}px`;
-    barCanvas.style.minWidth = `${larguraGrafico}px`;
-    barCanvas.parentElement && (barCanvas.parentElement.style.minWidth = `${larguraGrafico}px`);
-  }
-
   barChart = new Chart(barCanvas, {
     type: "bar",
     data: {
@@ -399,10 +394,10 @@ function renderGraficos() {
           backgroundColor: "#1fb6e9",
           borderRadius: 16,
           borderSkipped: false,
-          barThickness: isMobile() ? 56 : 88,
-          maxBarThickness: isMobile() ? 64 : 96,
-          categoryPercentage: 1,
-          barPercentage: 1
+          barThickness: isMobile() ? 38 : 58,
+          maxBarThickness: isMobile() ? 44 : 64,
+          categoryPercentage: 0.82,
+          barPercentage: 0.9
         }
       ]
     },
@@ -472,7 +467,6 @@ function renderRanking() {
   lista.style.overflowX = "hidden";
   lista.style.height = window.innerWidth <= 780 ? "300px" : "420px";
   lista.style.maxHeight = window.innerWidth <= 780 ? "300px" : "420px";
-  lista.classList.toggle("has-scroll", ranking.length > 5);
 
   if (!ranking.length) {
     lista.innerHTML = '<li class="empty-state">Nenhum aluno cadastrado.</li>';
@@ -519,12 +513,6 @@ function renderAlunos() {
   );
 
   lista.innerHTML = "";
-  lista.style.display = "block";
-  lista.style.overflowY = "auto";
-  lista.style.overflowX = "hidden";
-  lista.style.height = window.innerWidth <= 780 ? "300px" : "420px";
-  lista.style.maxHeight = window.innerWidth <= 780 ? "300px" : "420px";
-  lista.classList.toggle("has-scroll", ranking.length > 5);
 
   if (!alunosFiltrados.length) {
     lista.innerHTML = '<div class="card empty-state">Nenhum aluno encontrado.</div>';
