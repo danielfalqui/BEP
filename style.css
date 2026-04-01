@@ -262,6 +262,26 @@ body.menu-open {
   justify-content: flex-end;
 }
 
+.topbar-badges,
+.topbar-user-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.topbar-user-actions {
+  justify-content: flex-end;
+}
+
+.user-info {
+  text-align: right;
+}
+
+.topbar-logout {
+  min-width: 112px;
+}
+
 .header-logo {
   width: 86px;
   max-height: 52px;
@@ -427,10 +447,46 @@ body.menu-open {
   border-radius: 28px;
   padding: 22px;
   box-shadow: var(--shadow-soft);
+  overflow: hidden;
 }
 
 .card-accent {
   background: linear-gradient(180deg, #ffffff, #fcfdff);
+}
+
+.ranking-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 560px;
+  max-height: 560px;
+}
+
+.ranking-card .texto-secundario {
+  margin-bottom: 4px;
+}
+
+.ranking-list .empty-state {
+  padding: 20px;
+  text-align: center;
+}
+
+.chart-scroll-area {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.chart-scroll-inner {
+  height: 100%;
+  min-width: 100%;
+}
+
+.chart-scroll-inner canvas {
+  display: block;
+}
+
+.ranking-item {
+  margin-bottom: 12px;
 }
 
 .section-title {
@@ -450,8 +506,16 @@ body.menu-open {
 .stats-grid,
 .student-list,
 .ranking-list {
-  display: grid;
-  gap: 16px;
+  list-style: none;
+  display: block;
+  height: 420px;
+  min-height: 420px;
+  max-height: 420px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 8px;
+  margin-top: 12px;
+  scrollbar-gutter: stable;
 }
 
 .bottom-grid {
@@ -486,8 +550,15 @@ body.menu-open {
   font-size: clamp(24px, 6vw, 30px);
 }
 
-.ranking-list {
-  list-style: none;
+
+
+.ranking-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.ranking-list::-webkit-scrollbar-thumb {
+  background: rgba(31, 182, 233, 0.35);
+  border-radius: 999px;
 }
 
 .ranking-item,
@@ -693,21 +764,76 @@ th {
   }
 
   .topbar {
-    padding: 10px 12px;
-    align-items: flex-start;
+    padding: 12px 14px;
+    align-items: stretch;
+    gap: 12px;
   }
 
   .topbar-left,
   .topbar-right {
-    align-items: flex-start;
+    width: 100%;
+    align-items: center;
+  }
+
+  .topbar-left {
+    justify-content: flex-start;
+    gap: 10px;
   }
 
   .brand-header {
     gap: 10px;
+    flex: 1;
+    min-width: 0;
   }
 
   .header-logo {
-    width: 64px;
+    width: 48px;
+    max-height: 38px;
+  }
+
+  .topbar-title {
+    font-size: 18px;
+    line-height: 1.1;
+  }
+
+  .topbar-subtitle {
+    font-size: 12px;
+    margin-top: 2px;
+  }
+
+  .topbar-right {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .topbar-badges {
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .topbar-user-actions {
+    justify-content: space-between;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .topbar-badges .base-badge,
+  .topbar-badges .connection-badge {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .user-info {
+    text-align: left;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .topbar-logout {
+    width: auto;
+    min-width: 96px;
+    padding-inline: 18px;
   }
 
   .sidebar-backdrop {
@@ -746,8 +872,7 @@ th {
   .student-row,
   .student-left,
   .student-actions,
-  .modal-actions,
-  .topbar-right {
+  .modal-actions {
     width: 100%;
   }
 
@@ -756,6 +881,11 @@ th {
   .student-actions .btn,
   .modal-actions .btn {
     width: 100%;
+  }
+
+  .topbar .btn,
+  .topbar-logout {
+    width: auto;
   }
 
   .student-row,
@@ -810,5 +940,36 @@ th {
     content: attr(data-label);
     font-weight: 800;
     color: var(--bep-blue-strong);
+  }
+}
+
+
+@media (max-width: 780px) {
+  .ranking-card {
+    min-height: 430px;
+    max-height: 430px;
+  }
+
+  .ranking-list {
+    height: 300px;
+    min-height: 300px;
+    max-height: 300px;
+  }
+}
+
+
+@media (max-width: 420px) {
+  .topbar-badges {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .topbar-user-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .topbar-logout {
+    width: 100%;
   }
 }

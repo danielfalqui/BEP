@@ -59,10 +59,14 @@
       </div>
 
       <div class="topbar-right">
-        <span id="connectionBadge" class="connection-badge">Online</span>
-        <span id="baseBadge" class="base-badge">Carregando base...</span>
-        <span id="usuarioInfo" class="topbar-subtitle">Responsável: ...</span>
-        <button class="btn btn-secondary" onclick="logout()">Sair</button>
+        <div class="topbar-badges">
+          <span id="connectionBadge" class="connection-badge">Online</span>
+          <span id="baseBadge" class="base-badge">Carregando base...</span>
+        </div>
+        <div class="topbar-user-actions">
+          <span id="usuarioInfo" class="topbar-subtitle user-info">Responsável: ...</span>
+          <button class="btn btn-secondary topbar-logout" onclick="logout()">Sair</button>
+        </div>
       </div>
     </header>
 
@@ -100,8 +104,10 @@
               <div class="card card-accent">
                 <div class="section-title">Média por aluno</div>
                 <p class="texto-secundario">Comparativo das médias com base nos lançamentos registrados.</p>
-                <div class="chart-area">
-                  <canvas id="barChart"></canvas>
+                <div class="chart-area chart-scroll-area">
+                  <div class="chart-scroll-inner">
+                    <canvas id="barChart"></canvas>
+                  </div>
                 </div>
               </div>
 
@@ -114,7 +120,7 @@
                   </div>
                 </div>
 
-                <div class="card card-accent">
+                <div class="card card-accent ranking-card">
                   <div class="section-title">Ranking</div>
                   <p class="texto-secundario">Alunos ordenados pela média.</p>
                   <ul id="rankingList" class="ranking-list"></ul>

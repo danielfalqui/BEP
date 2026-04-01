@@ -377,6 +377,14 @@ function renderGraficos() {
 
   destruirGraficos();
 
+  const larguraPorBarra = isMobile() ? 88 : 110;
+  const larguraMinimaGrafico = isMobile() ? 520 : 780;
+  const larguraGrafico = Math.max(larguraMinimaGrafico, barras.length * larguraPorBarra);
+  if (barCanvas) {
+    barCanvas.style.width = `${larguraGrafico}px`;
+    barCanvas.style.minWidth = `${larguraGrafico}px`;
+  }
+
   barChart = new Chart(barCanvas, {
     type: "bar",
     data: {
@@ -388,7 +396,10 @@ function renderGraficos() {
           backgroundColor: "#1fb6e9",
           borderRadius: 16,
           borderSkipped: false,
-          maxBarThickness: isMobile() ? 24 : 36
+          barThickness: isMobile() ? 46 : 68,
+          maxBarThickness: isMobile() ? 54 : 76,
+          categoryPercentage: 0.98,
+          barPercentage: 0.98
         }
       ]
     },
@@ -450,10 +461,10 @@ function renderRanking() {
       base: aluno.bases?.nome || "",
       media: media(notasPorAluno.get(aluno.id) || [])
     }))
-    .sort((a, b) => b.media - a.media)
-    .slice(0, 8);
+    .sort((a, b) => b.media - a.media);
 
   lista.innerHTML = "";
+  lista.classList.toggle("has-scroll", ranking.length > 5);
 
   if (!ranking.length) {
     lista.innerHTML = '<li class="empty-state">Nenhum aluno cadastrado.</li>';
@@ -500,6 +511,7 @@ function renderAlunos() {
   );
 
   lista.innerHTML = "";
+  lista.classList.toggle("has-scroll", ranking.length > 5);
 
   if (!alunosFiltrados.length) {
     lista.innerHTML = '<div class="card empty-state">Nenhum aluno encontrado.</div>';
