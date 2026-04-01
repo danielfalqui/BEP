@@ -1136,3 +1136,16 @@ th {
     transform: rotate(360deg);
   }
 }
+@media (max-width: 780px) {
+
+  .topbar-title,
+  .topbar-subtitle {
+    display: none !important;
+  }
+
+  
+  #connectionBadge {
+    display: none !important;
+  }
+
+}
